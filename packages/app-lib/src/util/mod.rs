@@ -1,4 +1,5 @@
 //! Theseus utility functions
+pub mod backup;
 pub mod fetch;
 pub mod io;
 pub mod jre;

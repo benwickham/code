@@ -125,6 +125,24 @@ pub enum ErrorKind {
 
     #[error("Error resolving DNS: {0}")]
     DNSError(#[from] hickory_resolver::ResolveError),
+
+    #[error("Update interrupted during download: {0}")]
+    UpdateDownloadInterrupted(String),
+
+    #[error("Update interrupted during installation: {0}")]
+    UpdateInstallInterrupted(String),
+
+    #[error("Update backup failed: {0}")]
+    UpdateBackupFailed(String),
+
+    #[error("Update restore failed: {0}")]
+    UpdateRestoreFailed(String),
+
+    #[error("Update state persistence error: {0}")]
+    UpdateStatePersistenceError(String),
+
+    #[error("Deserialization error: {0}")]
+    DeserializationError(String),
 }
 
 #[derive(Debug)]

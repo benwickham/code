@@ -180,6 +180,9 @@ pub enum LoadingBarType {
         version: String,
         current_version: String,
     },
+    RecoveringUpdate {
+        version: String,
+    },
 }
 
 #[derive(Serialize, Clone)]

@@ -37,6 +37,9 @@ pub use self::friends::*;
 mod tunnel;
 pub use self::tunnel::*;
 
+mod update_recovery;
+pub use self::update_recovery::*;
+
 pub mod db;
 pub mod fs_watcher;
 mod mr_auth;

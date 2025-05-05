@@ -69,6 +69,22 @@ defineExpose({
       errorType.value = 'no_loader_version'
       supportLink.value = 'https://support.modrinth.com'
       metadata.value.profilePath = context.profilePath
+    } else if (errorVal.message && errorVal.message.includes('Update interrupted during download')) {
+      title.value = 'Update Recovery'
+      errorType.value = 'update_recovery'
+      supportLink.value = 'https://support.modrinth.com'
+      metadata.value.downloadInterrupted = true
+    } else if (errorVal.message && errorVal.message.includes('Update interrupted during installation')) {
+      title.value = 'Update Recovery'
+      errorType.value = 'update_recovery'
+      supportLink.value = 'https://support.modrinth.com'
+      metadata.value.installInterrupted = true
+    } else if (errorVal.message && (errorVal.message.includes('Update backup failed') || 
+                                   errorVal.message.includes('Update restore failed') ||
+                                   errorVal.message.includes('Update state persistence error'))) {
+      title.value = 'Update Recovery Failed'
+      errorType.value = 'update_recovery'
+      supportLink.value = 'https://support.modrinth.com'
     } else if (source === 'state_init') {
       title.value = 'Error initializing Modrinth App'
       errorType.value = 'state_init'
@@ -154,6 +170,50 @@ async function copyToClipboard(text) {
   <ModalWrapper ref="errorModal" :header="title" :closable="closable">
     <div class="modal-body">
       <div class="markdown-body">
+        <template v-if="errorType === 'update_recovery'">
+          <template v-if="metadata.downloadInterrupted">
+            <h3>Update download was interrupted</h3>
+            <p>
+              The Modrinth App was in the middle of downloading an update when it was interrupted.
+              We'll try to resume the download automatically. If this keeps happening, you can:
+            </p>
+            <ul>
+              <li>Check your internet connection</li>
+              <li>Make sure you have enough disk space</li>
+              <li>Try again later when servers might be less busy</li>
+            </ul>
+            <div class="cta-button">
+              <button class="btn btn-primary" @click="window.location.reload()">
+                <UpdatedIcon /> Retry update
+              </button>
+            </div>
+          </template>
+          <template v-else-if="metadata.installInterrupted">
+            <h3>Update installation was interrupted</h3>
+            <p>
+              The Modrinth App was in the middle of installing an update when it was interrupted.
+              We've restored your previous version from a backup. You can try updating again or
+              continue using the current version.
+            </p>
+            <div class="cta-button">
+              <button class="btn btn-primary" @click="window.location.reload()">
+                <UpdatedIcon /> Retry update
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <h3>Update recovery failed</h3>
+            <p>
+              The Modrinth App encountered an issue while trying to recover from an interrupted update.
+              We recommend redownloading the app from the Modrinth website.
+            </p>
+            <div class="cta-button">
+              <a href="https://modrinth.com/app" class="btn btn-primary">
+                <UpdatedIcon /> Download latest version
+              </a>
+            </div>
+          </template>
+        </template>
         <template v-if="errorType === 'minecraft_auth'">
           <template v-if="metadata.network">
             <h3>Network issues</h3>

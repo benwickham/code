@@ -30,57 +30,264 @@ async fn initialize_state(app: tauri::AppHandle) -> api::Result<()> {
 
         use tauri_plugin_updater::UpdaterExt;
 
-        let updater = app.updater_builder().build()?;
-
-        let update_fut = updater.check();
-
         tracing::info!("Initializing app state...");
         State::init().await?;
 
-        let check_bar = theseus::init_loading(
-            theseus::LoadingBarType::CheckingForUpdates,
-            1.0,
-            "Checking for updates...",
-        )
-        .await?;
+        let state = State::get().await?;
+        let update_info = theseus::UpdateInfo::load(&state.pool).await?;
 
-        tracing::info!("Checking for updates...");
-        let update = update_fut.await;
+        if update_info.was_interrupted() {
+            tracing::warn!("Detected interrupted update: {:?}", update_info);
+            
+            match update_info.state {
+                theseus::UpdateState::Downloading => {
+                    tracing::info!("Attempting to resume interrupted download");
+                    
+                    let recovery_bar_id = theseus::init_loading(
+                        theseus::LoadingBarType::RecoveringUpdate {
+                            version: update_info.version.clone().unwrap_or_else(|| "unknown".to_string()),
+                        },
+                        update_info.download_progress().unwrap_or(0.0) / 100.0,
+                        "Recovering interrupted update download...",
+                    )
+                    .await?;
 
-        drop(check_bar);
+                    if let (Some(download_url), Some(version)) = (&update_info.download_url, &update_info.version) {
+                        let updater = app.updater_builder().build()?;
+                        
+                        let update = tauri_plugin_updater::Update {
+                            version: version.clone(),
+                            current_version: env!("CARGO_PKG_VERSION").to_string(),
+                            download_url: download_url.clone(),
+                            body: None,
+                            date: None,
+                        };
 
-        if let Some(update) = update.ok().flatten() {
-            tracing::info!("Update found: {:?}", update.download_url);
-            let loader_bar_id = theseus::init_loading(
-                theseus::LoadingBarType::LauncherUpdate {
-                    version: update.version.clone(),
-                    current_version: update.current_version.clone(),
-                },
+                        // 100 MiB
+                        const DEFAULT_CONTENT_LENGTH: u64 = 1024 * 1024 * 100;
+
+                        let app_dir = app.path_resolver().app_dir().ok_or_else(|| {
+                            theseus::ErrorKind::UpdateBackupFailed("Could not determine app directory".to_string())
+                        })?;
+                        
+                        let backup = theseus::util::backup::Backup::create(&app_dir, &env!("CARGO_PKG_VERSION")).await?;
+
+                        let mut update_info = update_info.clone();
+                        update_info.state = theseus::UpdateState::Installing;
+                        update_info.save(&state.pool).await?;
+
+                        match update.download_and_install(
+                            |chunk_length, content_length| {
+                                let _ = theseus::emit_loading(
+                                    &recovery_bar_id,
+                                    (chunk_length as f64)
+                                        / (content_length
+                                            .unwrap_or(DEFAULT_CONTENT_LENGTH)
+                                            as f64),
+                                    None,
+                                );
+                                
+                                tauri::async_runtime::spawn({
+                                    let state = state.clone();
+                                    let mut update_info = update_info.clone();
+                                    async move {
+                                        if let Err(e) = update_info.update_download_progress(
+                                            chunk_length,
+                                            &state.pool,
+                                        ).await {
+                                            tracing::error!("Failed to update download progress: {}", e);
+                                        }
+                                    }
+                                });
+                            },
+                            || {},
+                        )
+                        .await {
+                            Ok(_) => {
+                                update_info.state = theseus::UpdateState::Completed;
+                                update_info.save(&state.pool).await?;
+                                
+                                tauri::async_runtime::spawn({
+                                    let app_dir = app_dir.clone();
+                                    async move {
+                                        if let Err(e) = theseus::util::backup::Backup::cleanup_old_backups(&app_dir, 3).await {
+                                            tracing::error!("Failed to clean up old backups: {}", e);
+                                        }
+                                    }
+                                });
+                                
+                                app.restart();
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to resume download: {}", e);
+                                
+                                update_info.mark_failed(format!("Failed to resume download: {}", e), &state.pool).await?;
+                                
+                                if let Err(restore_err) = backup.restore(&app_dir).await {
+                                    tracing::error!("Failed to restore from backup: {}", restore_err);
+                                    return Err(theseus::ErrorKind::UpdateRestoreFailed(
+                                        format!("Failed to restore from backup: {}", restore_err)
+                                    ).into());
+                                }
+                                
+                                drop(recovery_bar_id);
+                            }
+                        }
+                    } else {
+                        tracing::warn!("Insufficient information to resume download");
+                        update_info.reset(&state.pool).await?;
+                        drop(recovery_bar_id);
+                    }
+                }
+                theseus::UpdateState::Installing => {
+                    tracing::info!("Recovering from interrupted installation");
+                    
+                    let recovery_bar_id = theseus::init_loading(
+                        theseus::LoadingBarType::RecoveringUpdate {
+                            version: update_info.version.clone().unwrap_or_else(|| "unknown".to_string()),
+                        },
+                        0.5, // Installation is approximately 50% complete
+                        "Recovering from interrupted installation...",
+                    )
+                    .await?;
+                    
+                    let app_dir = app.path_resolver().app_dir().ok_or_else(|| {
+                        theseus::ErrorKind::UpdateRestoreFailed("Could not determine app directory".to_string())
+                    })?;
+                    
+                    if let Some(backup) = theseus::util::backup::Backup::find_latest(&app_dir).await? {
+                        tracing::info!("Found backup from version {}", backup.original_version);
+                        
+                        if let Err(e) = backup.restore(&app_dir).await {
+                            tracing::error!("Failed to restore from backup: {}", e);
+                            return Err(theseus::ErrorKind::UpdateRestoreFailed(
+                                format!("Failed to restore from backup: {}", e)
+                            ).into());
+                        }
+                        
+                        update_info.reset(&state.pool).await?;
+                        tracing::info!("Successfully restored from backup");
+                    } else {
+                        tracing::warn!("No backup found, resetting update state");
+                        update_info.reset(&state.pool).await?;
+                    }
+                    
+                    drop(recovery_bar_id);
+                }
+                _ => {
+                    tracing::warn!("Unexpected update state: {:?}", update_info.state);
+                    update_info.reset(&state.pool).await?;
+                }
+            }
+        } else {
+            let updater = app.updater_builder().build()?;
+            let update_fut = updater.check();
+
+            let check_bar = theseus::init_loading(
+                theseus::LoadingBarType::CheckingForUpdates,
                 1.0,
-                "Updating Modrinth App...",
+                "Checking for updates...",
             )
             .await?;
 
-            // 100 MiB
-            const DEFAULT_CONTENT_LENGTH: u64 = 1024 * 1024 * 100;
+            tracing::info!("Checking for updates...");
+            let update = update_fut.await;
 
-            update
-                .download_and_install(
-                    |chunk_length, content_length| {
-                        let _ = theseus::emit_loading(
-                            &loader_bar_id,
-                            (chunk_length as f64)
-                                / (content_length
-                                    .unwrap_or(DEFAULT_CONTENT_LENGTH)
-                                    as f64),
-                            None,
-                        );
+            drop(check_bar);
+
+            if let Some(update) = update.ok().flatten() {
+                tracing::info!("Update found: {:?}", update.download_url);
+                
+                let mut update_info = theseus::UpdateInfo::downloading(
+                    update.version.clone(),
+                    update.download_url.clone(),
+                    0, // Will be updated during download
+                    0,
+                    None,
+                );
+                update_info.save(&state.pool).await?;
+                
+                let loader_bar_id = theseus::init_loading(
+                    theseus::LoadingBarType::LauncherUpdate {
+                        version: update.version.clone(),
+                        current_version: update.current_version.clone(),
                     },
-                    || {},
+                    1.0,
+                    "Updating Modrinth App...",
                 )
                 .await?;
 
-            app.restart();
+                // 100 MiB
+                const DEFAULT_CONTENT_LENGTH: u64 = 1024 * 1024 * 100;
+
+                let app_dir = app.path_resolver().app_dir().ok_or_else(|| {
+                    theseus::ErrorKind::UpdateBackupFailed("Could not determine app directory".to_string())
+                })?;
+                
+                let backup = theseus::util::backup::Backup::create(&app_dir, &env!("CARGO_PKG_VERSION")).await?;
+
+                update_info.state = theseus::UpdateState::Installing;
+                update_info.save(&state.pool).await?;
+
+                match update
+                    .download_and_install(
+                        |chunk_length, content_length| {
+                            let _ = theseus::emit_loading(
+                                &loader_bar_id,
+                                (chunk_length as f64)
+                                    / (content_length
+                                        .unwrap_or(DEFAULT_CONTENT_LENGTH)
+                                        as f64),
+                                None,
+                            );
+                            
+                            tauri::async_runtime::spawn({
+                                let state = state.clone();
+                                let mut update_info = update_info.clone();
+                                async move {
+                                    if let Err(e) = update_info.update_download_progress(
+                                        chunk_length,
+                                        &state.pool,
+                                    ).await {
+                                        tracing::error!("Failed to update download progress: {}", e);
+                                    }
+                                }
+                            });
+                        },
+                        || {},
+                    )
+                    .await {
+                        Ok(_) => {
+                            update_info.state = theseus::UpdateState::Completed;
+                            update_info.save(&state.pool).await?;
+                            
+                            tauri::async_runtime::spawn({
+                                let app_dir = app_dir.clone();
+                                async move {
+                                    if let Err(e) = theseus::util::backup::Backup::cleanup_old_backups(&app_dir, 3).await {
+                                        tracing::error!("Failed to clean up old backups: {}", e);
+                                    }
+                                }
+                            });
+                            
+                            app.restart();
+                        }
+                        Err(e) => {
+                            tracing::error!("Update failed: {}", e);
+                            
+                            update_info.mark_failed(format!("Update failed: {}", e), &state.pool).await?;
+                            
+                            if let Err(restore_err) = backup.restore(&app_dir).await {
+                                tracing::error!("Failed to restore from backup: {}", restore_err);
+                                return Err(theseus::ErrorKind::UpdateRestoreFailed(
+                                    format!("Failed to restore from backup: {}", restore_err)
+                                ).into());
+                            }
+                            
+                            drop(loader_bar_id);
+                        }
+                    }
+            }
         }
     }
 
