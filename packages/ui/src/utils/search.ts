@@ -107,6 +107,7 @@ export function useSearch(
     { display: 'Followers', name: 'follows' },
     { display: 'Date published', name: 'newest' },
     { display: 'Date updated', name: 'updated' },
+    { display: 'Trending', name: 'trending' },
   ])
 
   const currentSortType: Ref<SortType> = ref({ name: 'best_match', display: 'Best Match' })
