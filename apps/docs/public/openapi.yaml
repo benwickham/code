@@ -1964,12 +1964,14 @@ paths:
           schema:
             type: string
             enum:
+              - best_match
               - relevance
               - downloads
               - follows
               - newest
               - updated
-            default: relevance
+              - trending
+            default: best_match
             example: downloads
           description: The sorting method used for sorting search results
         - in: query

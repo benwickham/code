@@ -102,7 +102,7 @@ export function useSearch(
   const maxResults = ref(20)
 
   const sortTypes: readonly SortType[] = readonly([
-    { display: 'Relevance', name: 'relevance' },
+    { display: 'Best Match', name: 'best_match' },
     { display: 'Downloads', name: 'downloads' },
     { display: 'Followers', name: 'follows' },
     { display: 'Date published', name: 'newest' },

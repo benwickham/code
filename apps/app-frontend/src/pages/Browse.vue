@@ -275,7 +275,7 @@ watch(
 
     projectType.value = newType
 
-    currentSortType.value = { display: 'Relevance', name: 'relevance' }
+    currentSortType.value = { display: 'Best Match', name: 'best_match' }
     query.value = ''
   },
 )

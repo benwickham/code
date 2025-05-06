@@ -486,6 +486,17 @@ const {
   createPageParams,
 } = useSearch(projectTypes, tags, serverFilters);
 
+// Ensure default sort is "best_match" for non-empty queries and "trending" for empty queries
+watch(query, (newQuery) => {
+  if (newQuery === '' && currentSortType.value.name !== 'trending') {
+    currentSortType.value = sortTypes.find(sort => sort.name === 'trending');
+    updateSearchResults();
+  } else if (newQuery !== '' && currentSortType.value.name === 'trending') {
+    currentSortType.value = sortTypes.find(sort => sort.name === 'best_match');
+    updateSearchResults();
+  }
+});
+
 const messages = defineMessages({
   gameVersionProvidedByServer: {
     id: "search.filter.locked.server-game-version.title",

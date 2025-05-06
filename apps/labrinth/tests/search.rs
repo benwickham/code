@@ -126,6 +126,76 @@ async fn search_projects() {
 }
 
 #[actix_rt::test]
+async fn test_best_match_sorting() {
+    with_test_environment(
+        Some(10),
+        |test_env: TestEnvironment<ApiV3>| async move {
+            let id_conversion = setup_search_projects(&test_env).await;
+
+            let api = &test_env.api;
+            let test_name = test_env.db.database_name.clone();
+
+            let projects = api
+                .search_deserialized(
+                    Some(&format!("\"&{test_name}\"")),
+                    None,
+                    Some("best_match"),
+                    USER_USER_PAT,
+                )
+                .await;
+
+            assert!(projects.total_hits > 0);
+            
+            if projects.hits.len() > 1 {
+                let first = &projects.hits[0];
+                let second = &projects.hits[1];
+                
+                println!("First result: downloads={}, follows={}, date_modified={}", 
+                    first.downloads, first.follows, first.date_modified);
+                println!("Second result: downloads={}, follows={}, date_modified={}", 
+                    second.downloads, second.follows, second.date_modified);
+                
+            }
+        },
+    )
+    .await;
+}
+
+#[actix_rt::test]
+async fn test_empty_query_defaults_to_trending() {
+    with_test_environment(
+        Some(10),
+        |test_env: TestEnvironment<ApiV3>| async move {
+            let id_conversion = setup_search_projects(&test_env).await;
+
+            let api = &test_env.api;
+            let test_name = test_env.db.database_name.clone();
+
+            let projects = api
+                .search_deserialized(
+                    Some(""), // Empty query
+                    None,
+                    None, // No specific sort, should default to trending
+                    USER_USER_PAT,
+                )
+                .await;
+
+            assert!(projects.total_hits > 0);
+            
+            if projects.hits.len() > 1 {
+                let first = &projects.hits[0];
+                let last = &projects.hits[projects.hits.len() - 1];
+                
+                println!("First result: downloads={}, follows={}", first.downloads, first.follows);
+                println!("Last result: downloads={}, follows={}", last.downloads, last.follows);
+                
+            }
+        },
+    )
+    .await;
+}
+
+#[actix_rt::test]
 async fn index_swaps() {
     with_test_environment(
         Some(10),

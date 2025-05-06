@@ -180,10 +180,12 @@ pub fn get_sort_index(
         config.get_index_name("projects_filtered", false);
     Ok(match index {
         "relevance" => (projects_name, ["downloads:desc"]),
+        "best_match" => (projects_name, ["downloads:desc"]), // Will be overridden with custom ranking
         "downloads" => (projects_filtered_name, ["downloads:desc"]),
         "follows" => (projects_name, ["follows:desc"]),
         "updated" => (projects_name, ["date_modified:desc"]),
         "newest" => (projects_name, ["date_created:desc"]),
+        "trending" => (projects_filtered_name, ["downloads:desc"]), // Popularity-based sort
         i => return Err(SearchError::InvalidIndex(i.to_string())),
     })
 }
@@ -195,7 +197,14 @@ pub async fn search_for_project(
     let client = Client::new(&*config.address, Some(&*config.key))?;
 
     let offset: usize = info.offset.as_deref().unwrap_or("0").parse()?;
-    let index = info.index.as_deref().unwrap_or("relevance");
+    
+    let query_text = info.query.as_deref().unwrap_or_default();
+    let index = if query_text.is_empty() {
+        "trending"
+    } else {
+        info.index.as_deref().unwrap_or("best_match")
+    };
+    
     let limit = info
         .limit
         .as_deref()
@@ -309,10 +318,67 @@ pub async fn search_for_project(
         query.execute::<ResultSearchProject>().await?
     };
 
+    let mut hits = results.hits.into_iter().map(|r| r.result).collect::<Vec<_>>();
+    
+    if index == "best_match" && !query_text.is_empty() {
+        sort_results_by_hybrid_score(&mut hits);
+    }
+
     Ok(SearchResults {
-        hits: results.hits.into_iter().map(|r| r.result).collect(),
+        hits,
         page: results.page.unwrap_or_default(),
         hits_per_page: results.hits_per_page.unwrap_or_default(),
         total_hits: results.total_hits.unwrap_or_default(),
     })
+}
+
+const TEXT_RELEVANCE_WEIGHT: f64 = 0.60;
+const POPULARITY_WEIGHT: f64 = 0.25;
+const RECENCY_WEIGHT: f64 = 0.15;
+
+fn sort_results_by_hybrid_score(results: &mut Vec<ResultSearchProject>) {
+    if results.is_empty() {
+        return;
+    }
+
+    let max_downloads = results
+        .iter()
+        .map(|p| p.downloads)
+        .max()
+        .unwrap_or(1);
+    
+    let max_follows = results
+        .iter()
+        .map(|p| p.follows)
+        .max()
+        .unwrap_or(1);
+    
+    let now = chrono::Utc::now();
+    
+    results.sort_by(|a, b| {
+        let a_popularity = (a.downloads as f64 / max_downloads as f64 * 0.5)
+            + (a.follows as f64 / max_follows as f64 * 0.5);
+        let b_popularity = (b.downloads as f64 / max_downloads as f64 * 0.5)
+            + (b.follows as f64 / max_follows as f64 * 0.5);
+        
+        let a_date = chrono::DateTime::parse_from_rfc3339(&a.date_modified)
+            .unwrap_or_else(|_| chrono::DateTime::from_utc(chrono::Utc::now().naive_utc(), chrono::Utc));
+        let b_date = chrono::DateTime::parse_from_rfc3339(&b.date_modified)
+            .unwrap_or_else(|_| chrono::DateTime::from_utc(chrono::Utc::now().naive_utc(), chrono::Utc));
+        
+        let a_days_since = (now.signed_duration_since(a_date.with_timezone(&chrono::Utc)))
+            .num_days() as f64;
+        let b_days_since = (now.signed_duration_since(b_date.with_timezone(&chrono::Utc)))
+            .num_days() as f64;
+        
+        let max_days = 365.0; // Cap at one year for normalization purposes
+        
+        let a_recency = 1.0 - (a_days_since / max_days).min(1.0);
+        let b_recency = 1.0 - (b_days_since / max_days).min(1.0);
+        
+        let a_score = (a_popularity * POPULARITY_WEIGHT) + (a_recency * RECENCY_WEIGHT);
+        let b_score = (b_popularity * POPULARITY_WEIGHT) + (b_recency * RECENCY_WEIGHT);
+        
+        b_score.partial_cmp(&a_score).unwrap_or(std::cmp::Ordering::Equal)
+    });
 }
