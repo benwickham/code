@@ -194,6 +194,17 @@ const pageCount = computed(() =>
   results.value ? Math.ceil(results.value.total_hits / results.value.limit) : 1,
 )
 
+// Watch for query changes to update sort type
+watch(query, (newQuery) => {
+  if (newQuery === '' && currentSortType.value.name !== 'trending') {
+    currentSortType.value = { display: 'Trending', name: 'trending' }
+    refreshSearch()
+  } else if (newQuery !== '' && currentSortType.value.name === 'trending') {
+    currentSortType.value = { display: 'Best Match', name: 'best_match' }
+    refreshSearch()
+  }
+})
+
 watch(requestParams, () => {
   if (!route.params.projectType) return
   refreshSearch()
@@ -275,7 +286,12 @@ watch(
 
     projectType.value = newType
 
-    currentSortType.value = { display: 'Best Match', name: 'best_match' }
+    // Set default sort based on query content
+    if (query.value === '') {
+      currentSortType.value = { display: 'Trending', name: 'trending' }
+    } else {
+      currentSortType.value = { display: 'Best Match', name: 'best_match' }
+    }
     query.value = ''
   },
 )
