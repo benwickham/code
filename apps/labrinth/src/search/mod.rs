@@ -179,7 +179,7 @@ pub fn get_sort_index(
     let projects_filtered_name =
         config.get_index_name("projects_filtered", false);
     Ok(match index {
-        "relevance" => (projects_name, ["downloads:desc"]),
+        "relevance" => (projects_name, ["downloads:desc"]), // Keep for backward compatibility
         "best_match" => (projects_name, ["downloads:desc"]), // Will be overridden with custom ranking
         "downloads" => (projects_filtered_name, ["downloads:desc"]),
         "follows" => (projects_name, ["follows:desc"]),
