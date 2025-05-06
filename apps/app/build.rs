@@ -1,6 +1,8 @@
 use tauri_build::{DefaultPermissionRule, InlinedPlugin};
 
 fn main() {
+    println!("cargo:rerun-if-changed=../packages/app-lib/migrations/20250506000000_update-restart-preference.sql");
+    
     // Sadly, there is no better way to do it right now
     // You could try parsing source code here and detecting #[tauri::command]
     // But I think it's not worth it

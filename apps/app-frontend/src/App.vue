@@ -46,6 +46,7 @@ import IncompatibilityWarningModal from '@/components/ui/install_flow/Incompatib
 import InstallConfirmModal from '@/components/ui/install_flow/InstallConfirmModal.vue'
 import { useInstall } from '@/store/install.js'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { get_opening_command, initialize_state } from '@/helpers/state'
 import { saveWindowState, StateFlags } from '@tauri-apps/plugin-window-state'
 import { renderString } from '@modrinth/utils'
@@ -55,6 +56,7 @@ import NavButton from '@/components/ui/NavButton.vue'
 import { get as getCreds, login, logout } from '@/helpers/mr_auth.js'
 import { get_user } from '@/helpers/cache.js'
 import AppSettingsModal from '@/components/ui/modal/AppSettingsModal.vue'
+import UpdateAvailableModal from '@/components/ui/UpdateAvailableModal.vue'
 import dayjs from 'dayjs'
 import PromotionWrapper from '@/components/ui/PromotionWrapper.vue'
 import { hide_ads_window, init_ads_window } from '@/helpers/ads.js'
@@ -229,6 +231,7 @@ const install = useInstall()
 const modInstallModal = ref()
 const installConfirmModal = ref()
 const incompatibilityWarningModal = ref()
+const updateAvailableModal = ref()
 
 const credentials = ref()
 
@@ -292,6 +295,11 @@ onMounted(() => {
   install.setIncompatibilityWarningModal(incompatibilityWarningModal)
   install.setInstallConfirmModal(installConfirmModal)
   install.setModInstallModal(modInstallModal)
+  
+  // Listen for update-ready events
+  const unlisten = listen('update-ready', () => {
+    updateAvailableModal.value.show()
+  })
 })
 
 const accounts = ref(null)
@@ -619,6 +627,7 @@ function handleAuxClick(e) {
   <ModInstallModal ref="modInstallModal" />
   <IncompatibilityWarningModal ref="incompatibilityWarningModal" />
   <InstallConfirmModal ref="installConfirmModal" />
+  <UpdateAvailableModal ref="updateAvailableModal" />
 </template>
 
 <style lang="scss" scoped>

@@ -12,6 +12,7 @@ tauri-build = { version = "2.2.0", features = ["codegen"] }
 
 [dependencies]
 theseus = { path = "../../packages/app-lib", features = ["tauri"] }
+qbsdiff = "1.4.3"
 
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }

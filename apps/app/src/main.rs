@@ -6,6 +6,7 @@
 use native_dialog::{DialogBuilder, MessageLevel};
 use std::env;
 use tauri::{Listener, Manager};
+use crate::api::updater;
 use theseus::prelude::*;
 
 mod api;
@@ -28,60 +29,19 @@ async fn initialize_state(app: tauri::AppHandle) -> api::Result<()> {
             break 'updater;
         }
 
-        use tauri_plugin_updater::UpdaterExt;
-
-        let updater = app.updater_builder().build()?;
-
-        let update_fut = updater.check();
-
         tracing::info!("Initializing app state...");
         State::init().await?;
 
-        let check_bar = theseus::init_loading(
-            theseus::LoadingBarType::CheckingForUpdates,
-            1.0,
-            "Checking for updates...",
-        )
-        .await?;
-
-        tracing::info!("Checking for updates...");
-        let update = update_fut.await;
-
-        drop(check_bar);
-
-        if let Some(update) = update.ok().flatten() {
-            tracing::info!("Update found: {:?}", update.download_url);
-            let loader_bar_id = theseus::init_loading(
-                theseus::LoadingBarType::LauncherUpdate {
-                    version: update.version.clone(),
-                    current_version: update.current_version.clone(),
-                },
-                1.0,
-                "Updating Modrinth App...",
-            )
-            .await?;
-
-            // 100 MiB
-            const DEFAULT_CONTENT_LENGTH: u64 = 1024 * 1024 * 100;
-
-            update
-                .download_and_install(
-                    |chunk_length, content_length| {
-                        let _ = theseus::emit_loading(
-                            &loader_bar_id,
-                            (chunk_length as f64)
-                                / (content_length
-                                    .unwrap_or(DEFAULT_CONTENT_LENGTH)
-                                    as f64),
-                            None,
-                        );
-                    },
-                    || {},
-                )
-                .await?;
-
+        if api::updater::check_restart_on_launch().await? {
             app.restart();
         }
+
+        let app_handle = app.handle();
+        tokio::spawn(async move {
+            if let Err(e) = api::updater::background_update_checker(app_handle).await {
+                tracing::error!("Background update checker error: {}", e);
+            }
+        });
     }
 
     #[cfg(not(feature = "updater"))]
@@ -166,7 +126,8 @@ fn main() {
 
     #[cfg(feature = "updater")]
     {
-        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build())
+                          .plugin(api::updater::init());
     }
 
     builder = builder
