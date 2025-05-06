@@ -320,7 +320,7 @@ pub async fn search_for_project(
 
     let mut hits = results.hits.into_iter().map(|r| r.result).collect::<Vec<_>>();
     
-    if index == "best_match" && !query_text.is_empty() {
+    if index == "best_match" {
         sort_results_by_hybrid_score(&mut hits);
     }
 
