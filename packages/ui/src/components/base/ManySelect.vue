@@ -73,7 +73,9 @@
 </template>
 <script setup lang="ts">
 import { CheckIcon, DropdownIcon, SearchIcon } from '@modrinth/assets'
-import { ButtonStyled, PopoutMenu, Button } from '../index'
+import ButtonStyled from './ButtonStyled.vue'
+import PopoutMenu from './PopoutMenu.vue'
+import Button from './Button.vue'
 import { computed, ref } from 'vue'
 import ScrollablePanel from './ScrollablePanel.vue'
 

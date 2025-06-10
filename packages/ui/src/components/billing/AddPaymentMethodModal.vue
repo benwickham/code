@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, nextTick, useTemplateRef } from 'vue'
 import { ButtonStyled, NewModal } from '../index'
 import { defineMessages, useVIntl } from '@vintl/vintl'
 import AddPaymentMethod from './AddPaymentMethod.vue'

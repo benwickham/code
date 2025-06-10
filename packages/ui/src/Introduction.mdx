@@ -1,0 +1,129 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Introduction" />
+
+# Modrinth Design System
+
+Welcome to the Modrinth Design System - a comprehensive collection of reusable components, design tokens, and guidelines that power the Modrinth ecosystem.
+
+## What is the Modrinth Design System?
+
+The Modrinth Design System is a unified framework that ensures consistency, accessibility, and quality across all Modrinth products. It provides:
+
+- **Reusable Components**: Battle-tested UI components built with Vue 3
+- **Design Tokens**: Consistent colors, typography, spacing, and more
+- **Accessibility**: WCAG 2.1 AA compliant components by default
+- **Developer Experience**: TypeScript support, comprehensive documentation, and testing utilities
+
+## Who is this for?
+
+- **Developers** building Modrinth applications and extensions
+- **Designers** creating consistent user experiences
+- **Contributors** extending and improving the design system
+- **Community** members building tools and integrations
+
+## Getting Started
+
+### Installation
+
+```bash
+# Install the UI package
+pnpm add @modrinth/ui
+
+# Install peer dependencies
+pnpm add vue@^3.0.0
+```
+
+### Basic Usage
+
+```vue
+<template>
+  <div>
+    <Button color="primary" @click="handleClick">
+      Get Started
+    </Button>
+    <Badge type="approved" />
+  </div>
+</template>
+
+<script setup>
+import { Button, Badge } from '@modrinth/ui'
+
+const handleClick = () => {
+  console.log('Welcome to Modrinth!')
+}
+</script>
+```
+
+## Design Principles
+
+### Accessibility First
+Every component is designed with accessibility in mind, following WCAG 2.1 AA guidelines and supporting screen readers, keyboard navigation, and high contrast modes.
+
+### Performance Optimized
+Components are built for performance with minimal bundle impact, efficient rendering, and optimized for both development and production environments.
+
+### Developer Friendly
+Comprehensive TypeScript support, clear APIs, and extensive documentation make integration seamless for developers of all experience levels.
+
+### Consistent & Cohesive
+A unified design language ensures that all Modrinth products feel like part of the same ecosystem while allowing for appropriate customization.
+
+## Architecture
+
+The Modrinth Design System is organized into several key areas:
+
+### 🎨 **Foundations**
+Core design elements that form the basis of all components:
+- **Colors**: Semantic color system with light/dark mode support
+- **Typography**: Consistent text styles and hierarchy
+- **Spacing**: Standardized spacing scale
+- **Icons**: Comprehensive icon library
+
+### 🧩 **Components**
+Reusable UI components organized by function:
+- **Actions**: Buttons, links, and interactive elements
+- **Navigation**: Menus, tabs, and navigation patterns
+- **Feedback**: Badges, alerts, and status indicators
+- **Layout**: Containers, grids, and structural components
+- **Forms**: Inputs, selects, and form controls
+
+### 📋 **Patterns**
+Complex multi-component examples and templates:
+- **Page Layouts**: Common page structures
+- **Data Display**: Tables, lists, and cards
+- **User Flows**: Authentication, onboarding, and workflows
+
+### 📖 **Guidelines**
+Best practices and usage recommendations:
+- **Accessibility**: Implementation guidelines
+- **Content**: Voice, tone, and writing guidelines
+- **Contribution**: How to extend and improve the system
+
+## Browser Support
+
+The Modrinth Design System supports all modern browsers:
+
+- **Chrome**: Latest 2 versions
+- **Firefox**: Latest 2 versions  
+- **Safari**: Latest 2 versions
+- **Edge**: Latest 2 versions
+
+## Contributing
+
+We welcome contributions from the community! Whether you're fixing bugs, adding features, or improving documentation, your help makes the design system better for everyone.
+
+- **Report Issues**: [GitHub Issues](https://github.com/modrinth/code/issues)
+- **Contribute Code**: [Contributing Guide](https://github.com/modrinth/code/blob/main/CONTRIBUTING.md)
+- **Join Discussions**: [Discord Community](https://discord.gg/modrinth)
+
+## Resources
+
+- **GitHub Repository**: [modrinth/code](https://github.com/modrinth/code)
+- **NPM Package**: [@modrinth/ui](https://www.npmjs.com/package/@modrinth/ui)
+- **Design Files**: [Figma Library](https://figma.com/modrinth) *(Coming Soon)*
+- **Changelog**: [Release Notes](https://github.com/modrinth/code/releases)
+
+---
+
+*Built with ❤️ by the Modrinth team and community contributors.* 

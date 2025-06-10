@@ -28,7 +28,7 @@ function toggleCollapsed() {
 </script>
 
 <template>
-  <div class="card">
+  <div class="card base-card">
     <div v-if="!!$slots.header || collapsible" class="header">
       <slot name="header"></slot>
       <div v-if="collapsible" class="btn-group">

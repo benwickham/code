@@ -4,6 +4,7 @@
     no-auto-focus
     :aria-id="dropdownId || null"
     placement="bottom-end"
+    theme="ribbit-popout"
     :class="dropdownClass"
     @apply-hide="focusTrigger"
     @apply-show="focusMenuChild"

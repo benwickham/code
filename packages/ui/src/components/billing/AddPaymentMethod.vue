@@ -26,8 +26,8 @@ const stripe = ref<StripsJs>()
 const elements = ref<StripeElements>()
 const error = ref(false)
 
-function handleError(error: Error) {
-  props.onError(error)
+function handleError(err: Error) {
+  props.onError(err)
   error.value = true
 }
 
@@ -55,7 +55,7 @@ async function reload(paymentMethods: Stripe.PaymentMethod[]) {
       elementsLoaded.value += 1
     })
   } catch (err) {
-    handleError(err)
+    handleError(err as Error)
   }
 }
 
@@ -75,11 +75,12 @@ async function submit(): Promise<boolean> {
 
   emit('stopLoading')
   if (error && error.type !== 'validation_error') {
-    handleError(error.message)
+    handleError(new Error(error.message))
     return false
   } else if (!error) {
     return true
   }
+  return false
 }
 
 defineExpose({
